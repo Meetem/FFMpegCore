@@ -16,6 +16,6 @@
 
         public string GetStreamArguments() => StreamFormat;
 
-        public Task WriteAsync(Stream outputStream, CancellationToken cancellationToken) => Source.CopyToAsync(outputStream, BlockSize, cancellationToken);
+        public Task WriteAsync(FFMpegContext? ctx, Stream outputStream) => Source.CopyToAsync(outputStream, BlockSize, ctx?.cancellation ?? CancellationToken.None);
     }
 }

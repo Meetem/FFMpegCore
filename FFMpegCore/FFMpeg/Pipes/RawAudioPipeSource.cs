@@ -25,16 +25,16 @@
             return $"-f {Format} -ar {SampleRate} -ac {Channels}";
         }
 
-        public async Task WriteAsync(Stream outputStream, CancellationToken cancellationToken)
+        public async Task WriteAsync(FFMpegContext? ctx, Stream outputStream)
         {
             if (_sampleEnumerator.MoveNext() && _sampleEnumerator.Current != null)
             {
-                await _sampleEnumerator.Current.SerializeAsync(outputStream, cancellationToken).ConfigureAwait(false);
+                await _sampleEnumerator.Current.SerializeAsync(outputStream, ctx?.cancellation ?? CancellationToken.None).ConfigureAwait(false);
             }
 
             while (_sampleEnumerator.MoveNext())
             {
-                await _sampleEnumerator.Current!.SerializeAsync(outputStream, cancellationToken).ConfigureAwait(false);
+                await _sampleEnumerator.Current!.SerializeAsync(outputStream, ctx?.cancellation ?? CancellationToken.None).ConfigureAwait(false);
             }
         }
     }

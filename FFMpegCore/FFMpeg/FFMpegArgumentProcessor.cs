@@ -92,15 +92,15 @@ namespace FFMpegCore
             return this;
         }
 
-        public bool ProcessSynchronously(bool throwOnError = true, FFOptions? ffMpegOptions = null)
+        public bool ProcessSynchronously(bool throwOnError = true, FFOptions? ffMpegOptions = null, CancellationTokenSource? cancel = null)
         {
             var options = GetConfiguredOptions(ffMpegOptions);
-            var processArguments = PrepareProcessArguments(options, out var cancellationTokenSource);
+            var processArguments = PrepareProcessArguments(options, ref cancel);
 
             IProcessResult? processResult = null;
             try
             {
-                processResult = Process(processArguments, cancellationTokenSource).ConfigureAwait(false).GetAwaiter().GetResult();
+                processResult = Process(processArguments, cancel!).ConfigureAwait(false).GetAwaiter().GetResult();
             }
             catch (OperationCanceledException)
             {
@@ -113,15 +113,15 @@ namespace FFMpegCore
             return HandleCompletion(throwOnError, processResult?.ExitCode ?? -1, processResult?.ErrorData ?? Array.Empty<string>());
         }
 
-        public async Task<bool> ProcessAsynchronously(bool throwOnError = true, FFOptions? ffMpegOptions = null)
+        public async Task<bool> ProcessAsynchronously(bool throwOnError = true, FFOptions? ffMpegOptions = null, CancellationTokenSource? cancel = null)
         {
             var options = GetConfiguredOptions(ffMpegOptions);
-            var processArguments = PrepareProcessArguments(options, out var cancellationTokenSource);
+            var processArguments = PrepareProcessArguments(options, ref cancel);
 
             IProcessResult? processResult = null;
             try
             {
-                processResult = await Process(processArguments, cancellationTokenSource).ConfigureAwait(false);
+                processResult = await Process(processArguments, cancel!).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -147,7 +147,7 @@ namespace FFMpegCore
                 cancelled = true;
                 instance.SendInput("q");
 
-                if (!cancellationTokenSource.Token.WaitHandle.WaitOne(timeout, true))
+                if (!cancellationTokenSource!.Token.WaitHandle.WaitOne(timeout, true))
                 {
                     cancellationTokenSource.Cancel();
                     instance.Kill();
@@ -156,14 +156,53 @@ namespace FFMpegCore
 
             CancelEvent += OnCancelEvent;
 
+            var processExited = new CancellationTokenSource();
+            var processKilled = new CancellationTokenSource();
+            
+            var ctx = new FFMpegContext(cancellationTokenSource, processKilled) 
+                { cancellation = cancellationTokenSource.Token, processExited = processExited.Token };
+            
             try
             {
-                await Task.WhenAll(instance.WaitForExitAsync().ContinueWith(t =>
+                var processTask = instance.WaitForExitAsync(processKilled.Token);
+                var duringTask = _ffMpegArguments.During(ctx);
+                
+                var completionTask = Task.WhenAny(processTask, duringTask);
+                await completionTask.ConfigureAwait(false);
+                
+                // process ended before during task
+                if (processTask.IsCompleted)
                 {
-                    processResult = t.Result;
+                    processExited.Cancel();
+                    processKilled.Cancel();
+                    
+                    if (processTask.IsFaulted) // if that was a forceful exit, cancel all further processing
+                        cancellationTokenSource.Cancel();
+                }
+                else if (duringTask.IsCompleted)
+                {
+                    if (duringTask.IsFaulted)
+                    {
+                        OnCancelEvent(ctx, 10000);
+                    }
+                }
+
+                await Task.WhenAll(processTask, duringTask).ConfigureAwait(false);
+                
+                if(!processExited.IsCancellationRequested)
+                    processExited.Cancel();
+                if(!processKilled.IsCancellationRequested)
+                    processKilled.Cancel();
+                if(!cancellationTokenSource.IsCancellationRequested)
                     cancellationTokenSource.Cancel();
-                    _ffMpegArguments.Post();
-                }), _ffMpegArguments.During(cancellationTokenSource.Token)).ConfigureAwait(false);
+                
+                processResult = processTask.Result;
+                
+                // Only release the pipe etc AFTER the process is exited,
+                // and all During() operations are completed.
+                // This made to fix the error when long processing in read/write pipes
+                // can abruptly close the pipe
+                _ffMpegArguments.Post();
 
                 if (cancelled)
                 {
@@ -175,6 +214,12 @@ namespace FFMpegCore
             finally
             {
                 CancelEvent -= OnCancelEvent;
+                processExited.Cancel();
+                processKilled.Cancel();
+                cancellationTokenSource.Cancel();
+                
+                processKilled.Dispose();
+                processExited.Dispose();
             }
         }
 
@@ -207,7 +252,7 @@ namespace FFMpegCore
         }
 
         private ProcessArguments PrepareProcessArguments(FFOptions ffOptions,
-            out CancellationTokenSource cancellationTokenSource)
+            ref CancellationTokenSource? cancellationTokenSource)
         {
             FFMpegHelper.RootExceptionCheck();
             FFMpegHelper.VerifyFFMpegExists(ffOptions);
@@ -237,7 +282,9 @@ namespace FFMpegCore
                 WorkingDirectory = ffOptions.WorkingDirectory
             };
             var processArguments = new ProcessArguments(startInfo);
-            cancellationTokenSource = new CancellationTokenSource();
+            
+            if(cancellationTokenSource == null)
+                cancellationTokenSource = new CancellationTokenSource();
 
             if (_onOutput != null)
             {

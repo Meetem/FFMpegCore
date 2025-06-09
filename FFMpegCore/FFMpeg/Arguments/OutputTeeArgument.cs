@@ -17,7 +17,7 @@ namespace FFMpegCore.Arguments
 
         public string Text => $"-f tee \"{string.Join("|", _options.Outputs.Select(MapOptions))}\"";
 
-        public Task During(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task During(FFMpegContext? ctx) => Task.CompletedTask;
 
         public void Post()
         {

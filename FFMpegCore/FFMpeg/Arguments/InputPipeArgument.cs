@@ -10,22 +10,23 @@ namespace FFMpegCore.Arguments
     {
         public readonly IPipeSource Writer;
 
-        public InputPipeArgument(IPipeSource writer) : base(PipeDirection.Out)
+        public InputPipeArgument(IPipeSource writer, int inBufferSize = 16777216, int outBufferSize = 16777216, PipeOptions options = PipeOptions.Asynchronous, PipeTransmissionMode transmission = PipeTransmissionMode.Byte) 
+            : base(PipeDirection.Out, inBufferSize, outBufferSize, options, transmission)
         {
             Writer = writer;
         }
 
         public override string Text => $"{Writer.GetStreamArguments()} -i \"{PipePath}\"";
 
-        protected override async Task ProcessDataAsync(CancellationToken token)
+        protected override async Task ProcessDataAsync(FFMpegContext? ctx)
         {
-            await Pipe.WaitForConnectionAsync(token).ConfigureAwait(false);
+            await Pipe.WaitForConnectionAsync(ctx?.cancellation ?? CancellationToken.None).ConfigureAwait(false);
             if (!Pipe.IsConnected)
             {
                 throw new OperationCanceledException();
             }
 
-            await Writer.WriteAsync(Pipe, token).ConfigureAwait(false);
+            await Writer.WriteAsync(ctx, Pipe).ConfigureAwait(false);
         }
     }
 }

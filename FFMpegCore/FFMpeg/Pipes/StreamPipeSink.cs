@@ -15,8 +15,8 @@
             Writer = (inputStream, cancellationToken) => inputStream.CopyToAsync(destination, BlockSize, cancellationToken);
         }
 
-        public async Task ReadAsync(Stream inputStream, CancellationToken cancellationToken)
-            => await Writer(inputStream, cancellationToken).ConfigureAwait(false);
+        public async Task ReadAsync(FFMpegContext? ctx, Stream inputStream)
+            => await Writer(inputStream, ctx?.cancellation ?? CancellationToken.None).ConfigureAwait(false);
 
         public string GetFormat() => Format;
     }

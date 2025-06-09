@@ -4,8 +4,11 @@ namespace FFMpegCore.Pipes
 {
     internal static class PipeHelpers
     {
-        public static string GetUnqiuePipeName() => $"FFMpegCore_{Guid.NewGuid().ToString("N").Substring(0, 5)}";
-
+        public static string GetUnqiuePipeName()
+        {
+            return $"FFMpegCore_{Guid.NewGuid().ToString("N").Substring(0, 8)}";
+        }
+        
         public static string GetPipePath(string pipeName)
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))

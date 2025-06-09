@@ -37,7 +37,7 @@
             return $"-map_metadata {index}";
         }
 
-        public Task During(CancellationToken cancellationToken = default)
+        public Task During(FFMpegContext? ctx)
         {
             return Task.CompletedTask;
         }

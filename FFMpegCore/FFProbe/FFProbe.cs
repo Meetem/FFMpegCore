@@ -128,10 +128,14 @@ namespace FFMpegCore
             var instance = PrepareStreamAnalysisInstance(pipeArgument.PipePath, ffOptions ?? GlobalFFOptions.Current, customArguments);
             pipeArgument.Pre();
 
+            var kill = new CancellationTokenSource();
+            var cancel = new CancellationTokenSource();
+            var ctx = new FFMpegContext(cancel, kill) { cancellation = cancellationToken, processExited = kill.Token};
+            
             var task = instance.StartAndWaitForExitAsync(cancellationToken);
             try
             {
-                await pipeArgument.During(cancellationToken).ConfigureAwait(false);
+                await pipeArgument.During(ctx).ConfigureAwait(false);
             }
             catch (IOException)
             {
@@ -139,6 +143,8 @@ namespace FFMpegCore
             finally
             {
                 pipeArgument.Post();
+                kill.Dispose();
+                cancel.Dispose();
             }
 
             var result = await task.ConfigureAwait(false);

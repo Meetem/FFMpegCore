@@ -3,7 +3,7 @@
     public interface IInputOutputArgument : IArgument
     {
         void Pre();
-        Task During(CancellationToken cancellationToken = default);
+        Task During(FFMpegContext? ctx);
         void Post();
     }
 }

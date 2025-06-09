@@ -95,10 +95,10 @@ namespace FFMpegCore
                 argument.Pre();
             }
         }
-        internal async Task During(CancellationToken cancellationToken = default)
+        internal async Task During(FFMpegContext? ctx)
         {
             var inputOutputArguments = Arguments.OfType<IInputOutputArgument>();
-            await Task.WhenAll(inputOutputArguments.Select(io => io.During(cancellationToken))).ConfigureAwait(false);
+            await Task.WhenAll(inputOutputArguments.Select(io => io.During(ctx))).ConfigureAwait(false);
         }
         internal void Post()
         {

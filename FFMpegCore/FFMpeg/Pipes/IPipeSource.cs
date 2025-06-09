@@ -6,6 +6,6 @@
     public interface IPipeSource
     {
         string GetStreamArguments();
-        Task WriteAsync(Stream outputStream, CancellationToken cancellationToken);
+        Task WriteAsync(FFMpegContext? ctx, Stream outputStream);
     }
 }

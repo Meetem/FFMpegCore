@@ -43,8 +43,9 @@ namespace FFMpegCore.Pipes
             return $"-f rawvideo -r {FrameRate.ToString(CultureInfo.InvariantCulture)} -pix_fmt {StreamFormat} -s {Width}x{Height}";
         }
 
-        public async Task WriteAsync(Stream outputStream, CancellationToken cancellationToken)
+        public async Task WriteAsync(FFMpegContext? ctx, Stream outputStream)
         {
+            var cancellationToken = ctx?.cancellation ?? CancellationToken.None;
             if (_framesEnumerator.Current != null)
             {
                 CheckFrameAndThrow(_framesEnumerator.Current);

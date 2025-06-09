@@ -2,7 +2,7 @@
 {
     public interface IPipeSink
     {
-        Task ReadAsync(Stream inputStream, CancellationToken cancellationToken);
+        Task ReadAsync(FFMpegContext? ctx, Stream inputStream);
         string GetFormat();
     }
 }
